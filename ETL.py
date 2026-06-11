@@ -66,20 +66,6 @@ orders_df = original_orders_df.dropDuplicates()
 returns_df = original_returns_df.dropDuplicates()
 order_items_df = original_order_items_df.dropDuplicates()
 
-'''
-#Handling the Duplicates: does not work
-duplicate_customers_df = original_customers_df.subtract(customers_df)
-duplicate_orders_df = original_orders_df.subtract(orders_df)
-duplicate_returns_df = original_returns_df.subtract(returns_df)
-duplicate_order_items_df = original_order_items_df.subtract(order_items_df)
-
-print('Printing Duplicates')
-duplicate_customers_df.show()
-duplicate_orders_df.show()
-duplicate_order_items_df.show()
-duplicate_returns_df.show()
-print('End of duplicates')
-'''
 
 #DROP ROWS WHERE ORDER_ID OR CUSTOMER_ID IS NULL
 cleaned_customers_df = customers_df.na.drop(subset=["customer_id"])
