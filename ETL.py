@@ -60,7 +60,7 @@ print('Completed printing the Original DFs\n')
 
 #DATA QUALITY AND CLEANING
 
-    #DROPPING DUPLICATES
+#DROPPING DUPLICATES
 customers_df = original_customers_df.dropDuplicates()
 orders_df = original_orders_df.dropDuplicates()
 returns_df = original_returns_df.dropDuplicates()
@@ -215,33 +215,18 @@ rev_per_category_month_df = orders_joined_items_df.groupBy('month', 'category').
 rev_per_month_df = orders_joined_items_df.groupBy('month').agg(sum('net_amount').alias('monthly_total_revenue')).orderBy('month')
 
 #join the total rev per category df to the monthly total rev df
-category_month_df1 = rev_per_category_month_df.join(rev_per_month_df, on='month', how='inner').orderBy('month')
+category_month_df = rev_per_category_month_df.join(rev_per_month_df, on='month', how='inner').orderBy('month')
 
 #calculate the revenue share
-category_month_df2 = category_month_df1.withColumn('revenue_share', col('category_revenue_per_month') / col('monthly_total_revenue')).orderBy('month')
+revenue_share_df = category_month_df.withColumn('revenue_share', col('category_revenue_per_month') / col('monthly_total_revenue')).orderBy('month')
 
 print('Start Window Functions')
 
-count_unique_customer_orders_df.show()
-print(count_unique_customer_orders_df.count())
-
-lifetime_net_spend_df.show()
-print(lifetime_net_spend_df.count())
-
-customer_lifetime_net_spend_df.show()
-print(customer_lifetime_net_spend_df.count())
-
 ranked_customer_lifetime_net_spend_df.show()
 
-orders_timestamp_in_seconds_df.show()
 orders_rolling_count_df.show()
 
-
-orders_joined_items_df.show()
-rev_per_category_month_df.show()
-rev_per_month_df.show()
-category_month_df1.show()
-category_month_df2.show()
+revenue_share_df.show()
 
 print('End window functions\n')
 
@@ -306,43 +291,43 @@ customer_total_refund_amount_df = return_cust_df.join(total_refund_amount_df, on
 top_10_df = customer_total_refund_amount_df.orderBy(col('total_refund_amount').desc())
 
 #BOOLEAN COLUMN FOR where refund exceeds order
-refund_exceeds_order_df = order_returns_df.join(derived_orders_df, on='customer_id', how='inner')
+#selecting the order_id and net_amount column from the derived_orders_df
+orderId_netamount_df = derived_orders_df.select(col('order_id'), col('net_amount'))
 
-withBoolean_return_analysis_df = refund_exceeds_order_df.withColumn(
-    'refund_amount > net_amount',
-    col('refund_amount') > col('net_amount')
+refund_joined_orders_df = customer_total_refund_amount_df.join(orderId_netamount_df, on='order_id', how='inner')
+
+withBoolean_return_analysis_df = refund_joined_orders_df.withColumn(
+    'total_refund_amount > net_amount',
+    col('total_refund_amount') > col('net_amount')
 )
+
+refund_vs_net_df = withBoolean_return_analysis_df.select( col('return_id'), col('total_refund_amount'), col('net_amount'), col('total_refund_amount > net_amount'))
 
 print('Start Return Analysis')
 
 #print return rate per category
-order_count_df.show()
-print(order_count_df.count())
-return_count_df.show()
-print(return_count_df.count())
 return_rate_per_category_df.show()
-print(return_rate_per_category_df.count())
 
 #Print return rate per customer tier
-order_count_per_cust_tier_df.show()
-print(order_count_per_cust_tier_df.count())
-return_count_per_cust_tier_df.show()
-print(return_count_per_cust_tier_df.count())
 return_rate_per_tier_df.show()
-print(return_rate_per_tier_df.count())
 
 #print the total refund amount
-count_unique_order_returns_df.show()
-order_returns_df.show()
-print(count_unique_order_returns_df.count())
-total_refund_amount_df.show()
-print(total_refund_amount_df.count())
 customer_total_refund_amount_df.show()
 print(customer_total_refund_amount_df.count())
 top_10_df.show(10)
-refund_exceeds_order_df.show()
+
+refund_joined_orders_df.show()
 withBoolean_return_analysis_df.show()
+refund_vs_net_df.show()
 
 print("Return Analysis End")
+
+#OUTPUT AND PARTITIONING
+
+customer_total_refund_amount_df.write.mode("overwrite").parquet("./parquet/cust_total_refund_amount")
+
+refund_joined_orders_df.write.mode('overwrite').partitionBy("year", "month").parquet("./parquet/refund_joined_orders")
+
+category_month_df.write.mode("overwrite").partitionBy("year", "month").parquet("./parquet/revenue_dist_per_month")
 
 spark.stop()
